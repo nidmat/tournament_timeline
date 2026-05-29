@@ -1,3 +1,6 @@
+    if not valid_chart_df.empty:
+        valid_chart_df['Display Label'] = valid_chart_df['Game Type'] + " (" + valid_chart_df['Round/Match'] + ")"
+
         # 4. Generate the Stacked Timeline Chart
         st.subheader("📊 Schedule Timeline")
 
@@ -17,13 +20,11 @@
         
         fig.update_layout(
             xaxis_tickformat="%b %d, %I:%M %p",
-            height=350,            # Keeps the vertical height short and sleek
-            width=1400,            # Forces a long horizontal layout to stretch the bars out
+            height=350,            
+            width=1400,            
             showlegend=True,
             xaxis_title="Timeline",
-            margin=dict(l=50, r=50, t=50, b=50) # Tighter margins for a cleaner look
+            margin=dict(l=50, r=50, t=50, b=50)
         )
 
-        # Setting use_container_width=False allows the 1400px width to take effect,
-        # creating a smooth horizontal scroll tracking experience on phone screens!
         st.plotly_chart(fig, use_container_width=False)
