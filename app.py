@@ -76,9 +76,9 @@ if not chart_df.empty:
         fig.update_yaxes(autorange="reversed")
         fig.update_traces(textposition="inside")
         
-        # Find the first game's start time and add 12 hours for the initial view
+        # Find the first game's start time and add 4 hours to make the default view wider
         earliest_game = valid_chart_df['Start'].min()
-        twelve_hours_later = earliest_game + pd.Timedelta(hours=12)
+        four_hours_later = earliest_game + pd.Timedelta(hours=4)
         
         fig.update_layout(
             xaxis_tickformat="%I %p",
@@ -88,10 +88,10 @@ if not chart_df.empty:
             margin=dict(l=10, r=10, t=40, b=10),
             
             xaxis=dict(
-                range=[earliest_game, twelve_hours_later],
+                range=[earliest_game, four_hours_later],
                 type="date",
                 tickmode="linear",
-                dtick=3600000  # Forces grid mark exactly every 1 hour (in milliseconds)
+                dtick=3600000  # Forces a grid mark exactly every 1 hour (in milliseconds)
             )
         )
 
