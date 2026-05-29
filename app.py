@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, time
 
 st.set_page_config(page_title="Tournament Timeline", layout="wide")
 st.title("🏆 Tournament Schedule & Timeline")
 st.markdown("Add, delete, or update rounds below. Multiple matches in the same category will automatically line up on the same bar to catch time overlaps.")
 
-# 1. Initialize data with structural support for multiple rounds per game
+# 1. Initialize session data with ultra-safe, explicit strings
 if 'schedule_df' not in st.session_state:
     default_data = {
         "Game Type": ["Soccer", "Soccer", "Soccer", "Basketball", "Basketball", "Chess", "Carroms", "Cards-28"],
@@ -17,14 +16,14 @@ if 'schedule_df' not in st.session_state:
             "Adult (M)", "Adult (M)", 
             "Adult (F)", "Adult (F)", "Adult (F)"
         ],
-        "Start Time": ["09:00", "11:00", "14:00", "09:30", "13:00", "09:00", "10:30", "13:00"],
-        "End Time": ["10:15", "12:15", "15:15", "11:00", "14:30", "10:00", "11:30", "14:30"]
+        "Start Time": ["09:00 AM", "11:00 AM", "02:00 PM", "09:30 AM", "01:00 PM", "09:00 AM", "10:30 AM", "01:00 PM"],
+        "End Time": ["10:15 AM", "12:15 PM", "03:15 PM", "11:00 AM", "02:30 PM", "10:00 AM", "11:30 AM", "02:30 PM"]
     }
     st.session_state.schedule_df = pd.DataFrame(default_data)
 
-# 2. Simplified Dynamic Interface (Bypasses Python 3.14 column metrics tracking)
+# 2. Dynamic Interface Setup
 st.subheader("🗓️ Edit Tournament Matches & Rounds")
-st.caption("💡 Tip: Double-click a cell to edit. To add a row, scroll down and use the '+' row. To delete, select a row and hit Delete.")
+st.caption("💡 Tip: Double-click a cell to edit. You can type times as standard 12-hour format (e.g., 9:30 AM, 1:15 PM).")
 
 edited_df = st.data_editor(
     st.session_state.schedule_df,
@@ -37,23 +36,27 @@ edited_df = st.data_editor(
 )
 
 st.session_state.schedule_df = edited_df
-chart_df = edited_df.dropna().copy()
 
-# 3. Process Data for the Timeline Chart safely using robust string conversion
+# Drop rows that are completely empty
+chart_df = edited_df.dropna(subset=["Start Time", "End Time", "Game Type", "Round/Match"]).copy()
+
+# 3. Forgiving Data Parsing Logic
 if not chart_df.empty:
-    try:
-        # Converts simple text string inputs (e.g. "09:00") straight into Datetime blocks
-        chart_df['Start'] = pd.to_datetime(chart_df['Start Time'], format='%H:%M', errors='coerce')
-        chart_df['End'] = pd.to_datetime(chart_df['End Time'], format='%H:%M', errors='coerce')
-        chart_df = chart_df.dropna(subset=['Start', 'End'])
-        
-        chart_df['Display Label'] = chart_df['Game Type'] + " (" + chart_df['Round/Match'] + ")"
+    # Use errors='coerce' to clear out unparseable rows instead of crashing the app
+    chart_df['Start'] = pd.to_datetime(chart_df['Start Time'], errors='coerce')
+    chart_df['End'] = pd.to_datetime(chart_df['End Time'], errors='coerce')
+    
+    # Filter out rows where the user is still actively typing or formatting is completely broken
+    valid_chart_df = chart_df.dropna(subset=['Start', 'End']).copy()
+    
+    if not valid_chart_df.empty:
+        valid_chart_df['Display Label'] = valid_chart_df['Game Type'] + " (" + valid_chart_df['Round/Match'] + ")"
 
         # 4. Generate the Stacked Timeline Chart
         st.subheader("📊 Schedule Timeline")
 
         fig = px.timeline(
-            chart_df, 
+            valid_chart_df, 
             x_start="Start", 
             x_end="End", 
             y="Category",           
@@ -73,7 +76,7 @@ if not chart_df.empty:
         )
 
         st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error("Please ensure times are entered cleanly in 24-hour HH:MM format (e.g., 09:30 or 14:15).")
+    else:
+        st.warning("⏱️ Waiting for a valid time format. Please enter times like '9:00 AM' or '14:30'.")
 else:
     st.info("Add some games to the schedule table above to populate the timeline visual.")
