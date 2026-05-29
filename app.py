@@ -42,7 +42,6 @@ chart_df = edited_df.dropna(subset=["Start Time", "End Time", "Game Type", "Roun
 
 # 3. Forgiving Data Parsing Logic
 if not chart_df.empty:
-    # Use errors='coerce' to clear out unparseable rows instead of crashing the app
     chart_df['Start'] = pd.to_datetime(chart_df['Start Time'], errors='coerce')
     chart_df['End'] = pd.to_datetime(chart_df['End Time'], errors='coerce')
     
@@ -67,12 +66,15 @@ if not chart_df.empty:
         )
 
         fig.update_yaxes(autorange="reversed")
+        
+        # FIX: Move textposition configuration to update_traces
+        fig.update_traces(textposition="inside")
+        
         fig.update_layout(
             xaxis_tickformat="%I:%M %p",
             height=400,
             showlegend=True,
-            xaxis_title="Time of Day",
-            textposition="inside"    
+            xaxis_title="Time of Day"
         )
 
         st.plotly_chart(fig, use_container_width=True)
