@@ -15,24 +15,27 @@
         fig.update_yaxes(autorange="reversed")
         fig.update_traces(textposition="inside")
         
-        # Define the exact 12-hour window for the default mobile view (First day: 8 AM to 8 PM)
-        default_start_view = "2026-05-30 08:00:00"
-        default_end_view = "2026-05-30 20:00:00"
+        # Find the first game's start time and add 12 hours for the initial view
+        earliest_game = valid_chart_df['Start'].min()
+        twelve_hours_later = earliest_game + pd.Timedelta(hours=12)
         
         fig.update_layout(
-            xaxis_tickformat="%b %d, %I:%M %p",
-            height=300,                          # Slimmer vertical footprint for phone screens
+            xaxis_tickformat="%I %p",             # Simplifies labels to just hour format (e.g., 09 AM, 10 AM)
+            height=350,            
             showlegend=True,
             xaxis_title="Timeline (Drag to scroll / Pinch to zoom)",
-            margin=dict(l=10, r=10, t=40, b=10), # Tiny margins so it hugs the mobile edges perfectly
+            margin=dict(l=10, r=10, t=40, b=10),
             
-            # This locks the initial screen view to your preferred 12-hour window
             xaxis=dict(
-                range=[default_start_view, default_end_view],
-                type="date"
+                range=[earliest_game, twelve_hours_later],
+                type="date",
+                tickmode="linear",                # Enables manual control over the grid lines
+                dtick=3600000                     # Forces a grid mark exactly every 1 hour (in milliseconds)
             )
         )
 
-        # We switch this back to True so the chart framework resizes beautifully 
-        # into the mobile screen layout, relying on Plotly's inner zoom instead of browser scrolling.
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("⏱️ Waiting for a valid date/time format. Please enter like '2026-05-30 09:00 AM'.")
+else:
+    st.info("Add some games to the schedule table above to populate the timeline visual.")
