@@ -4,9 +4,9 @@ import plotly.express as px
 
 st.set_page_config(page_title="Tournament Timeline", layout="wide")
 st.title("🏆 Tournament Schedule & Timeline")
-st.markdown("Add, delete, or update rounds below. Multiple matches in the same category will automatically line up on the same bar to catch time overlaps.")
+st.markdown("Add, delete, or update rounds below. You can include both the Date and Time in the fields to manage multi-day tournaments.")
 
-# 1. Initialize session data with ultra-safe, explicit strings
+# 1. Initialize session data with Date and Time combined
 if 'schedule_df' not in st.session_state:
     default_data = {
         "Game Type": ["Soccer", "Soccer", "Soccer", "Basketball", "Basketball", "Chess", "Carroms", "Cards-28"],
@@ -16,14 +16,23 @@ if 'schedule_df' not in st.session_state:
             "Adult (M)", "Adult (M)", 
             "Adult (F)", "Adult (F)", "Adult (F)"
         ],
-        "Start Time": ["09:00 AM", "11:00 AM", "02:00 PM", "09:30 AM", "01:00 PM", "09:00 AM", "10:30 AM", "01:00 PM"],
-        "End Time": ["10:15 AM", "12:15 PM", "03:15 PM", "11:00 AM", "02:30 PM", "10:00 AM", "11:30 AM", "02:30 PM"]
+        # Pre-populated with dates (YYYY-MM-DD HH:MM AM/PM)
+        "Start Date & Time": [
+            "2026-05-30 09:00 AM", "2026-05-30 11:00 AM", "2026-05-30 02:00 PM", 
+            "2026-05-31 09:30 AM", "2026-05-31 01:00 PM", 
+            "2026-05-30 09:00 AM", "2026-05-30 10:30 AM", "2026-05-31 01:00 PM"
+        ],
+        "End Date & Time": [
+            "2026-05-30 10:15 AM", "2026-05-30 12:15 PM", "2026-05-30 03:15 PM", 
+            "2026-05-31 11:00 AM", "2026-05-31 02:30 PM", 
+            "2026-05-30 10:00 AM", "2026-05-30 11:30 AM", "2026-05-31 02:30 PM"
+        ]
     }
     st.session_state.schedule_df = pd.DataFrame(default_data)
 
 # 2. Dynamic Interface Setup
 st.subheader("🗓️ Edit Tournament Matches & Rounds")
-st.caption("💡 Tip: Double-click a cell to edit. You can type times as standard 12-hour format (e.g., 9:30 AM, 1:15 PM).")
+st.caption("💡 Tip: Enter dates and times together (e.g., '2026-05-30 9:30 AM' or '05/30/2026 13:00').")
 
 edited_df = st.data_editor(
     st.session_state.schedule_df,
@@ -38,14 +47,14 @@ edited_df = st.data_editor(
 st.session_state.schedule_df = edited_df
 
 # Drop rows that are completely empty
-chart_df = edited_df.dropna(subset=["Start Time", "End Time", "Game Type", "Round/Match"]).copy()
+chart_df = edited_df.dropna(subset=["Start Date & Time", "End Date & Time", "Game Type", "Round/Match"]).copy()
 
 # 3. Forgiving Data Parsing Logic
 if not chart_df.empty:
-    chart_df['Start'] = pd.to_datetime(chart_df['Start Time'], errors='coerce')
-    chart_df['End'] = pd.to_datetime(chart_df['End Time'], errors='coerce')
+    chart_df['Start'] = pd.to_datetime(chart_df['Start Date & Time'], errors='coerce')
+    chart_df['End'] = pd.to_datetime(chart_df['End Date & Time'], errors='coerce')
     
-    # Filter out rows where the user is still actively typing or formatting is completely broken
+    # Filter out rows where the parsing is incomplete
     valid_chart_df = chart_df.dropna(subset=['Start', 'End']).copy()
     
     if not valid_chart_df.empty:
@@ -66,19 +75,18 @@ if not chart_df.empty:
         )
 
         fig.update_yaxes(autorange="reversed")
-        
-        # FIX: Move textposition configuration to update_traces
         fig.update_traces(textposition="inside")
         
         fig.update_layout(
-            xaxis_tickformat="%I:%M %p",
+            # Shows Month, Day, and 12-hour Time format on the bottom timeline axis
+            xaxis_tickformat="%b %d, %I:%M %p",
             height=400,
             showlegend=True,
-            xaxis_title="Time of Day"
+            xaxis_title="Timeline"
         )
 
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("⏱️ Waiting for a valid time format. Please enter times like '9:00 AM' or '14:30'.")
+        st.warning("⏱️ Waiting for a valid date/time format. Please enter like '2026-05-30 09:00 AM'.")
 else:
     st.info("Add some games to the schedule table above to populate the timeline visual.")
