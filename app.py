@@ -17,74 +17,63 @@ if 'schedule_df' not in st.session_state:
             "Adult (M)", "Adult (M)", 
             "Adult (F)", "Adult (F)", "Adult (F)"
         ],
-        "Start Time": [time(9, 0), time(11, 0), time(14, 0), time(9, 30), time(13, 0), time(9, 0), time(10, 30), time(13, 0)],
-        "End Time": [time(10, 15), time(12, 15), time(15, 15), time(11, 0), time(14, 30), time(10, 0), time(11, 30), time(14, 30)]
+        "Start Time": ["09:00", "11:00", "14:00", "09:30", "13:00", "09:00", "10:30", "13:00"],
+        "End Time": ["10:15", "12:15", "15:15", "11:00", "14:30", "10:00", "11:30", "14:30"]
     }
     st.session_state.schedule_df = pd.DataFrame(default_data)
 
-# 2. Interactive Data Editor Interface (Set num_rows="dynamic" to allow adding/deleting rows)
+# 2. Simplified Dynamic Interface (Bypasses Python 3.14 column metrics tracking)
 st.subheader("🗓️ Edit Tournament Matches & Rounds")
-st.caption("💡 Tip: To add a new match, scroll to the bottom of the table and look for the '+' row. To delete, select a row and hit Delete on your keyboard.")
+st.caption("💡 Tip: Double-click a cell to edit. To add a row, scroll down and use the '+' row. To delete, select a row and hit Delete.")
 
 edited_df = st.data_editor(
     st.session_state.schedule_df,
     num_rows="dynamic",
     use_container_width=True,
     column_config={
-        "Game Type": st.column_config.SelectboxColumn(
-            "Game Type",
-            options=["Soccer", "Chess", "Carroms", "Cards-Rummy", "Cards-28", "Basketball", "Table Tennis", "Throwball"],
-            required=True
-        ),
-        "Round/Match": st.column_config.TextColumn("Round / Match Name", placeholder="e.g., Semi-Final", required=True),
-        "Category": st.column_config.SelectboxColumn(
-            "Category",
-            options=["Elementary (M)", "Adult (M)", "Adult (F)"],
-            required=True
-        ),
-        "Start Time": st.column_config.TimeColumn("Start Time", format="hh:mm a", step=900, required=True),
-        "End Time": st.column_config.TimeColumn("End Time", format="hh:mm a", step=900, required=True)
+        "Game Type": st.column_config.SelectboxColumn("Game Type", options=["Soccer", "Chess", "Carroms", "Cards-Rummy", "Cards-28", "Basketball", "Table Tennis", "Throwball"]),
+        "Category": st.column_config.SelectboxColumn("Category", options=["Elementary (M)", "Adult (M)", "Adult (F)"])
     }
 )
 
-# Save edits back to session state
 st.session_state.schedule_df = edited_df
+chart_df = edited_df.dropna().copy()
 
-# Drop completely empty rows if any exist from dynamic additions
-chart_df = edited_df.dropna(subset=["Start Time", "End Time", "Game Type", "Round/Match"]).copy()
-
-# 3. Process Data for the Timeline Chart
+# 3. Process Data for the Timeline Chart safely using robust string conversion
 if not chart_df.empty:
-    chart_df['Start'] = chart_df['Start Time'].apply(lambda t: datetime.combine(datetime.today(), t))
-    chart_df['End'] = chart_df['End Time'].apply(lambda t: datetime.combine(datetime.today(), t))
-    
-    # Create a nice label string to display inside the colored bar block
-    chart_df['Display Label'] = chart_df['Game Type'] + " (" + chart_df['Round/Match'] + ")"
+    try:
+        # Converts simple text string inputs (e.g. "09:00") straight into Datetime blocks
+        chart_df['Start'] = pd.to_datetime(chart_df['Start Time'], format='%H:%M', errors='coerce')
+        chart_df['End'] = pd.to_datetime(chart_df['End Time'], format='%H:%M', errors='coerce')
+        chart_df = chart_df.dropna(subset=['Start', 'End'])
+        
+        chart_df['Display Label'] = chart_df['Game Type'] + " (" + chart_df['Round/Match'] + ")"
 
-    # 4. Generate the Stacked Timeline Chart
-    st.subheader("📊 Schedule Timeline")
+        # 4. Generate the Stacked Timeline Chart
+        st.subheader("📊 Schedule Timeline")
 
-    fig = px.timeline(
-        chart_df, 
-        x_start="Start", 
-        x_end="End", 
-        y="Category",           # Keeps one row per major category bracket
-        color="Game Type",       # Colors match blocks by sport type (Soccer, Chess, etc.)
-        text="Display Label",    # Puts "Soccer (Round 1)" directly inside the bar block
-        labels={"Category": "Participating Category"},
-        title="Tournament Schedule Progression by Category"
-    )
+        fig = px.timeline(
+            chart_df, 
+            x_start="Start", 
+            x_end="End", 
+            y="Category",           
+            color="Game Type",       
+            text="Display Label",    
+            labels={"Category": "Participating Category"},
+            title="Tournament Schedule Progression by Category"
+        )
 
-    # Clean up chart layout
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(
-        xaxis_tickformat="%I:%M %p",
-        height=400,
-        showlegend=True,
-        xaxis_title="Time of Day",
-        textposition="inside"    # Forces text to stay cleanly inside the timeline segments
-    )
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(
+            xaxis_tickformat="%I:%M %p",
+            height=400,
+            showlegend=True,
+            xaxis_title="Time of Day",
+            textposition="inside"    
+        )
 
-    st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error("Please ensure times are entered cleanly in 24-hour HH:MM format (e.g., 09:30 or 14:15).")
 else:
     st.info("Add some games to the schedule table above to populate the timeline visual.")
