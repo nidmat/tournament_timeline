@@ -4,7 +4,7 @@ import plotly.express as px
 
 st.set_page_config(page_title="Tournament Timeline", layout="wide")
 st.title("🏆 Tournament Schedule & Timeline")
-st.markdown("Add, delete, or update rounds below. You can include both the Date and Time in the fields to manage multi-day tournaments.")
+st.markdown("Add, delete, or update rounds below. Visuals scale automatically to keep bars perfectly proportioned.")
 
 # 1. Initialize session data with Date and Time combined
 if 'schedule_df' not in st.session_state:
@@ -29,9 +29,33 @@ if 'schedule_df' not in st.session_state:
     }
     st.session_state.schedule_df = pd.DataFrame(default_data)
 
+# Helper function to cleanly shrink category names for the Y-Axis
+def short_cat(cat):
+    mapping = {"Elementary (M)": "Ele (M)", "Adult (M)": "Adlt (M)", "Adult (F)": "Adlt (F)"}
+    return mapping.get(cat, cat)
+
+# Helper function to cleanly shrink game types for the Y-Axis
+def short_game(game):
+    mapping = {"Soccer": "Socr", "Basketball": "Bskt", "Chess": "Ches", "Carroms": "Carm", "Cards-28": "Cd28", "Cards-Rummy": "Rumy", "Table Tennis": "TT", "Throwball": "Thrw"}
+    return mapping.get(game, game)
+
+# Helper function to map rounds to short codes inside the bars
+def short_round(round_text):
+    if not isinstance(round_text, str):
+        return ""
+    r_lower = round_text.lower()
+    if "round 1" in r_lower or "rd 1" in r_lower:
+        return "R1"
+    elif "round 2" in r_lower or "rd 2" in r_lower:
+        return "R2"
+    elif "semi" in r_lower or "sf" in r_lower:
+        return "SF"
+    elif "final" in r_lower or "fi" in r_lower:
+        return "FI"
+    return round_text  # Fallback if it's a unique custom name
+
 # 2. Dynamic Interface Setup
 st.subheader("🗓️ Edit Tournament Matches & Rounds")
-st.caption("💡 Tip: Enter dates and times together (e.g., '2026-05-30 9:30 AM' or '05/30/2026 13:00').")
 
 edited_df = st.data_editor(
     st.session_state.schedule_df,
@@ -48,16 +72,19 @@ st.session_state.schedule_df = edited_df
 # Drop rows that are completely empty
 chart_df = edited_df.dropna(subset=["Start Date & Time", "End Date & Time", "Game Type", "Round/Match"]).copy()
 
-# 3. Forgiving Data Parsing Logic
+# 3. Data Processing & String Formatting
 if not chart_df.empty:
     chart_df['Start'] = pd.to_datetime(chart_df['Start Date & Time'], errors='coerce')
     chart_df['End'] = pd.to_datetime(chart_df['End Date & Time'], errors='coerce')
     
-    # Filter out rows where the parsing is incomplete
     valid_chart_df = chart_df.dropna(subset=['Start', 'End']).copy()
     
     if not valid_chart_df.empty:
-        valid_chart_df['Display Label'] = valid_chart_df['Game Type'] + " (" + valid_chart_df['Round/Match'] + ")"
+        # Create the short Y-Axis label grouping: "Ele (M) - Socr"
+        valid_chart_df['Y_Axis_Label'] = valid_chart_df['Category'].apply(short_cat) + " - " + valid_chart_df['Game Type'].apply(short_game)
+        
+        # Create the short bar labels: "R1", "SF", "FI"
+        valid_chart_df['Bar_Label'] = valid_chart_df['Round/Match'].apply(short_round)
 
         # 4. Generate the Stacked Timeline Chart
         st.subheader("📊 Schedule Timeline")
@@ -66,23 +93,27 @@ if not chart_df.empty:
             valid_chart_df, 
             x_start="Start", 
             x_end="End", 
-            y="Category",           
+            y="Y_Axis_Label",        # Group games by unique Category + Sport rows
             color="Game Type",       
-            text="Display Label",    
-            labels={"Category": "Participating Category"},
-            title="Tournament Schedule Progression by Category"
+            text="Bar_Label",        # Shows ONLY R1, SF, FI inside the blocks
+            labels={"Y_Axis_Label": "Bracket / Game"},
+            title="Tournament Schedule Progression"
         )
 
         fig.update_yaxes(autorange="reversed")
         fig.update_traces(textposition="inside")
         
-        # Find the first game's start time and add 4 hours to make the default view wider
+        # Dynamic Height Calculation: Counts unique Y rows and adds baseline padding
+        # This keeps the individual bar heights perfectly locked and uniform!
+        num_unique_rows = valid_chart_df['Y_Axis_Label'].nunique()
+        calculated_height = max(200, (num_unique_rows * 55) + 100)
+        
         earliest_game = valid_chart_df['Start'].min()
         four_hours_later = earliest_game + pd.Timedelta(hours=4)
         
         fig.update_layout(
             xaxis_tickformat="%I %p",
-            height=350,            
+            height=calculated_height,  # Applied the fixed bar height formula here
             showlegend=True,
             xaxis_title="Timeline (Drag to scroll / Pinch to zoom)",
             margin=dict(l=10, r=10, t=40, b=10),
@@ -91,7 +122,7 @@ if not chart_df.empty:
                 range=[earliest_game, four_hours_later],
                 type="date",
                 tickmode="linear",
-                dtick=3600000  # Forces a grid mark exactly every 1 hour (in milliseconds)
+                dtick=3600000  
             )
         )
 
